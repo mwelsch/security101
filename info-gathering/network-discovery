@@ -1,0 +1,9 @@
+# Host discovery
+nmap -v -sn 192.168.0.0/16 #ping scan, no port scans
+nmap -v -sL 192.168.0.0/16 #sL: List Scan - simply list targets to scan
+## Both will not 100% work to discover windows pcs, (see here)[https://superuser.com/questions/1137912/ping-to-windows-10-not-working-if-file-and-printer-sharing-is-turned-off]
+sudo nmap -O 192.168.0.0/16 -v # do OS scan on all devices (should work nearly always to discover all hosts)
+
+# Look for packages:
+sudo netdiscover
+https://nmap.org/book/man-examples.html
