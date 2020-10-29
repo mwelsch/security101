@@ -11,4 +11,4 @@ client.sendto(("GET / HTTP/1.1\r\nHost: %s\r\n\r\n" % target_host).encode("utf-8
 
 #receive data
 response, adr = client.recvfrom(4096)
-print(response.decode("utf-8"))welsch
+print(response.decode("utf-8"))
