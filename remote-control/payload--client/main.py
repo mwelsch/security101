@@ -28,3 +28,6 @@ if __name__ == '__main__':
     start_async_screen_capture()
     start_async_updater()
     start_async_keyboard_input()
+    while "queue is running":
+        sleep(3600) #one hour
+
