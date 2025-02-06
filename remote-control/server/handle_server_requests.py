@@ -1,6 +1,7 @@
 import asyncio
 import base64
 from flask import render_template
+from flask_socketio import emit
 
 
 class ServerHandler:
@@ -22,6 +23,8 @@ class ServerHandler:
 
         return render_template('control.html', user_image = self.database.get_last_screenshot())
 
+    def stream_newest_image(self):
+            emit('newest_image_returned', {'data': self.database.get_last_screenshot()})
 
 
 class PseudoDatabase:
