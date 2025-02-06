@@ -1,7 +1,6 @@
+import asyncio
 import base64
-from io import BytesIO
-
-from flask import render_template, send_file
+from flask import render_template
 
 
 class ServerHandler:
@@ -22,6 +21,7 @@ class ServerHandler:
         #         download_name="Renamed.jpg", as_attachment=True)
 
         return render_template('control.html', user_image = self.database.get_last_screenshot())
+
 
 
 class PseudoDatabase:
