@@ -70,9 +70,9 @@ git clone https://github.com/ente-io/ente.git
 cd ente
 git submodule update --init --recursive
 ```
-Create a `web/Dockerfile` (my content is below, I commented out the cast part and updated the FROM version to 21 rather than 20).
+Create a `web/Dockerfile` (my content is below, I commented out the cast part and updated the FROM version to 23 rather than 20).
 
-Add the following to a `compose.yaml` (docker-compose will build the image in this case, if you want to build manually and insert the new tag manually use the above guide to build the web app, remove the build part and comment out the image part and insert your image name)
+Add the following to a `compose.yaml` (docker-compose will build the image in this case, if you want to build manually and insert the new tag manually each time: use the above guide (https://help.ente.io/self-hosting/guides/web-app) to build the web app, remove the build part and comment out the image part and insert your image name)
 
 ```
 services:
@@ -91,21 +91,6 @@ services:
     restart: always
 
 ```
-
-```
-ente-web:
-    image: <image-name> # name of the image you used while building
-    ports:
-        - 3000:3000
-        - 3001:3001
-        - 3002:3002
-        - 3003:3003
-        - 3004:3004
-    environment:
-        - NODE_ENV=development
-    restart: always
-```
-
 
 `museum.yaml`
 ```
@@ -178,7 +163,7 @@ jwt:
 ```
 `Dockerfile` for building web app
 ```
-FROM node:21-bookworm-slim as builder
+FROM node:23-bookworm-slim as builder
 
 WORKDIR ./ente
 
@@ -196,7 +181,7 @@ RUN yarn cache clean
 RUN yarn install --network-timeout 1000000000
 RUN yarn build:photos && yarn build:accounts && yarn build:auth #&& yarn build:cast
 
-FROM node:21-bookworm-slim
+FROM node:23-bookworm-slim
 WORKDIR /app
 
 COPY --from=builder /ente/apps/photos/out /app/photos
