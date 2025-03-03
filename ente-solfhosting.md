@@ -63,8 +63,48 @@ In the `./scripts/compose/` directory you need to adjust the `minio-provision.sh
 docker run --rm ghcr.io/edythecow/ente-server-tools go run tools/gen-random-keys/main.go
 ```
 
+# Running the web app behind traefik:
+For this step lets run the web app in a seperate location (could also be a seperate server afaik) to keep stuff simple. From [this guide](https://help.ente.io/self-hosting/guides/web-app)
+```
+git clone https://github.com/ente-io/ente.git
+cd ente
+git submodule update --init --recursive
+```
+Create a `web/Dockerfile` (my content is below, I commented out the cast part and updated the FROM version to 21 rather than 20).
 
+Add the following to a `compose.yaml` (docker-compose will build the image in this case, if you want to build manually and insert the new tag manually use the above guide to build the web app, remove the build part and comment out the image part and insert your image name)
 
+```
+services:
+  ente-web:
+    build:
+      context: web
+    #image: <image-name> # name of the image you used while building
+    ports:
+        - 3000:3000
+        - 3001:3001
+        - 3002:3002
+        - 3003:3003
+        - 3004:3004
+    environment:
+        - NODE_ENV=development
+    restart: always
+
+```
+
+```
+ente-web:
+    image: <image-name> # name of the image you used while building
+    ports:
+        - 3000:3000
+        - 3001:3001
+        - 3002:3002
+        - 3003:3003
+        - 3004:3004
+    environment:
+        - NODE_ENV=development
+    restart: always
+```
 
 
 `museum.yaml`
@@ -135,4 +175,54 @@ jwt:
 #    # The email address from which to send the email. Set this to an email
 #    # address whose credentials you're providing.
 #    email: 
+```
+`Dockerfile` for building web app
+```
+FROM node:21-bookworm-slim as builder
+
+WORKDIR ./ente
+
+COPY . .
+COPY apps/ .
+
+# Will help default to yarn versoin 1.22.22
+RUN corepack enable
+
+# Endpoint for Ente Server
+ENV NEXT_PUBLIC_ENTE_ENDPOINT=https://your-ente-endpoint.com
+ENV NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT=https://your-albums-endpoint.com
+
+RUN yarn cache clean
+RUN yarn install --network-timeout 1000000000
+RUN yarn build:photos && yarn build:accounts && yarn build:auth #&& yarn build:cast
+
+FROM node:21-bookworm-slim
+WORKDIR /app
+
+COPY --from=builder /ente/apps/photos/out /app/photos
+COPY --from=builder /ente/apps/accounts/out /app/accounts
+COPY --from=builder /ente/apps/auth/out /app/auth
+#COPY --from=builder /ente/apps/cast/out /app/cast
+
+RUN npm install -g serve
+
+ENV PHOTOS=3000
+EXPOSE ${PHOTOS}
+
+ENV ACCOUNTS=3001
+EXPOSE ${ACCOUNTS}
+
+ENV AUTH=3002
+EXPOSE ${AUTH}
+
+#ENV CAST=3003
+#EXPOSE ${CAST}
+
+# The albums app does not have navigable pages on it, but the
+# port will be exposed in-order to self up the albums endpoint
+# `apps.public-albums` in museum.yaml configuration file.
+ENV ALBUMS=3004
+EXPOSE ${ALBUMS}
+
+CMD ["sh", "-c", "serve /app/photos -l tcp://0.0.0.0:${PHOTOS} & serve /app/accounts -l tcp://0.0.0.0:${ACCOUNTS} & serve /app/auth -l tcp://0.0.0.0:${AUTH} & serve /app/cast -l tcp://0.0.0.0:${CAST}"]
 ```
