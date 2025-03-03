@@ -107,10 +107,7 @@ YOU MIGHT NEED TO ADJUST FOR YOUR TRAEFIK CONFIG
 # Create accounts
 You can create an account and obtain the OTP from the docker logs if you did not configure an email server
 
-
-# Combine everything into one docker-compose
-IF EVERYTHING WORKED SO FAR:
-
+# Increase storage limit
 
 ```
 services:
