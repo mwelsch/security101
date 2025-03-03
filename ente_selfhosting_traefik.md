@@ -1,0 +1,322 @@
+# Selfhosting Ente (Photos) behind traefik on one single server
+
+
+1. Clone the repo and initialize submodules:
+```
+git clone https://github.com/ente-io/ente.git
+cd ente
+git submodule update --init --recursive
+```
+2. Place a Dockerfile insinde `web` Folder to build the web app. Either use the [official one provided here](https://help.ente.io/self-hosting/guides/web-app) or my modified version attached below. I modified it TO ONLY RUN ENTE PHOTOS!
+3. Create a `compose.yaml` file in the main directory (yes there is one inside the server, but if I come back to update stuff later I will not remember where it was...). The code for the file is attached below and I explain there the modification I made to the original file. Your traefik config will probably be different from mine so you might need to change parts!
+4. Create a `museum.yaml` file based on the one provided bellow. To generate new secrets use theis oneline provided from [this kind github](https://github.com/EdyTheCow/ente-selfhost) repo
+```
+docker run --rm ghcr.io/edythecow/ente-server-tools go run tools/gen-random-keys/main.go
+```
+5. Change `POSTGRES_PASSWORD` and `MINIO_ROOT_PASSWORD` (and optionally `MINIO_ROOT_USER`) in the `compose.yaml`!
+In the `./scripts/compose/` directory you also need to adjust the `minio-provision.sh` file with the new `MINIO_ROOT_PASSWORD` (and optionally `MINIO_ROOT_USER`) __AND__ the `credentials.yaml`with the new `POSTGRES_PASSWORD` and `MINIO_ROOT_PASSWORD` (and optionally `MINIO_ROOT_USER`)
+
+### Now you should be able to reach your ente server under photos.example (you can also try api.example/ping )
+
+## Create account
+You can create an account and obtain the OTP from the docker logs if you did not configure an email server
+
+## Adjust storage
+I created an account via the web interface but maybe the account can also be created via CLI.
+I downloaded and extracted the CLI from the releasas page of the ente github repo. In the same directory as the executable ([alternative/details](https://help.ente.io/self-hosting/guides/selfhost-cli)) create a `config.yaml`:
+```
+endpoint:
+    api: "https://api.example"
+```
+Now run
+```
+
+```
+
+# `compose.yaml`
+0. I do not like docker volumes and modified the file to only use local directories
+1. Add the network your traefik container is in. In my case the tail of the file looks like this:
+```
+networks:
+  internal:
+  default:
+    external:
+      name: web
+```
+2. Change the museum part to be also included in that network and add labels. With this change you do not need to publicly expose port 8080
+```
+   #ports:
+    #  - 8080:8080 # API
+    #  - 2112:2112 # Prometheus metrics - I THINK can be commented out if you do not use promotheus
+    [...]
+    networks:
+      - internal
+      - default
+    labels:
+      - traefik.http.routers.enteapi.rule=Host(`api.example.com`)
+      - traefik.http.routers.enteapi.tls.certresolver=YOURDEFAULTCERTRESOLVER
+      - traefik.http.services.enteapi.loadbalancer.server.port=8080
+```
+3. I commented out Port `5432` of the PostgreSQL container since the museum container accesses it locally and after 5 minutes I got approx 10 requests/second from someone trying to bruteforce their way into the database
+4. adjust relative paths
+## Finished part
+
+```
+services:
+  museum:
+    build:
+      context: server
+      args:
+        GIT_COMMIT: development-cluster
+    #image: ghcr.io/ente-io/server
+    #ports:
+    #  - 8080:8080 # API
+    #  - 2112:2112 # Prometheus metrics
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Pass-in the config to connect to the DB and MinIO
+      ENTE_CREDENTIALS_FILE: /credentials.yaml
+    volumes:
+      - ./custom-logs:/var/logs
+      - ./museum.yaml:/museum.yaml:ro
+      - ./server/scripts/compose/credentials.yaml:/credentials.yaml:ro #ADJUST RELATIVE PATH
+      - ./data:/data:ro
+    networks:
+      - internal
+      - default
+    labels:
+      - traefik.http.routers.enteapi.rule=Host(`api.example`)
+      - traefik.http.routers.enteapi.tls.certresolver=default
+      - traefik.http.services.enteapi.loadbalancer.server.port=8080
+
+  # Resolve "localhost:3200" in the museum container to the minio container.
+  socat:
+    image: alpine/socat
+    network_mode: service:museum
+    depends_on:
+      - museum
+    command: "TCP-LISTEN:3200,fork,reuseaddr TCP:minio:3200"
+
+  postgres:
+    image: postgres:16
+    #ports:
+    #  - 5432:5432
+    environment:
+      POSTGRES_USER: pguser
+      POSTGRES_PASSWORD: CHANGEME
+      POSTGRES_DB: ente_db
+    # Wait for postgres to accept connections before starting museum.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "-q",
+          "-d",
+          "ente_db",
+          "-U",
+          "pguser"
+        ]
+      start_period: 40s
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  minio:
+    image: minio/minio
+    # Use different ports than the minio defaults to avoid conflicting
+    # with the ports used by Prometheus.
+    ports:
+      - 3200:3200 # API
+      - 3201:3201 # Console
+    environment:
+      MINIO_ROOT_USER: CHANGEME
+      MINIO_ROOT_PASSWORD: CHANGEME
+    command: server /data --address ":3200" --console-address ":3201"
+    volumes:
+      - ./minio-data:/data
+    networks:
+      - internal
+
+  minio-provision:
+    image: minio/mc
+    depends_on:
+      - minio
+    volumes:
+      - ./server/scripts/compose/minio-provision.sh:/provision.sh:ro #ADJUST RELATIVE PATH
+      - ./minio-data:/data
+    networks:
+      - internal
+    entrypoint: sh /provision.sh
+
+
+
+
+
+  ente-web:
+    build:
+      context: web
+    #image: <image-name> # name of the image you used while building
+    #ports:
+    #  - 3000:3000
+    #  - 3001:3001
+    #  - 3002:3002
+    #  - 3003:3003
+    #  - 3004:3004
+    environment:
+      - NODE_ENV=development
+      - ENDPOINT=https://api.example
+      - ALBUMS_ENDPOINT=https://albums.example # ALSO MATCH IN THE museum.yaml !
+    restart: always
+    labels:
+      - traefik.http.routers.photos.rule=Host(`photos.example`)
+      - traefik.http.routers.photos.tls.certresolver=default
+      - traefik.http.routers.photos.service=svc_photos
+      - traefik.http.services.svc_photos.loadbalancer.server.port=3000
+      - traefik.http.routers.albums.rule=Host(`albums.example`) # ALSO MATCH IN THE museum.yaml !
+      - traefik.http.routers.albums.tls.certresolver=default
+      - traefik.http.routers.albums.service=svc_albums
+      - traefik.http.services.svc_albums.loadbalancer.server.port=3004
+      #IF YOU WANT TO USE ENTE AUTH
+      #- traefik.http.routers.auth.rule=Host(`auth.example`)
+      #- traefik.http.routers.auth.tls.certresolver=default
+      #- traefik.http.routers.auth.service=svc_auth
+      #- traefik.http.services.svc_auth.loadbalancer.server.port=3002
+    networks:
+      - default
+
+
+
+networks:
+  internal:
+  default:
+    external:
+      name: web
+
+```
+# `museum.yaml`
+```
+# HTTP connection parameters
+http:
+    # If true, bind to 443 and use TLS.
+    # By default, this is false, and museum will bind to 8080 without TLS.
+    # use-tls: true
+
+# Specify the base endpoints for various apps
+apps:
+    # Default is https://albums.ente.io
+    #
+    # If you're running a self hosted instance and wish to serve public links,
+    # set this to the URL where your albums web app is running.
+    public-albums: https://albums.example.com
+
+
+# Passkey support (optional)
+# Use case: MFA
+webauthn:
+    # Our "Relying Party" ID. This scopes the generated credentials.
+    # See: https://www.w3.org/TR/webauthn-3/#rp-id
+    rpid: accounts.example.com
+    # Whitelist of origins from where we will accept WebAuthn requests.
+    # See: https://github.com/go-webauthn/webauthn
+    rporigins:
+        - "https://accounts.example.com"
+
+s3:
+    are_local_buckets: true
+    b2-eu-cen:
+        key: admin
+        secret: changeme
+        endpoint: https://minio.example.com
+        region: eu-central-2
+        bucket: b2-eu-cen
+key:
+    encryption: mysecret
+    hash: mysecret
+jwt:
+    secret: mysecret
+
+
+
+# Add this once you have done the CLI part
+#internal:
+#    admins:
+#        - 1580559962386438
+
+
+# SMTP configuration (optional)
+#
+# Configure credentials here for sending mails from museum (e.g. OTP emails).
+#
+# The smtp credentials will be used if the host is specified. Otherwise it will
+# try to use the transmail credentials. Ideally, one of smtp or transmail should
+# be configured for a production instance.
+#
+# username and password are optional (e.g. if you're using a local relay server
+# and don't need authentication).
+#smtp:
+#    host: 
+#    port: 
+#    username: 
+#    password: 
+#    # The email address from which to send the email. Set this to an email
+#    # address whose credentials you're providing.
+#    email: 
+```
+
+
+
+# `Dockerfile` for building ONLY PHOTOS web app
+```
+FROM node:23-bookworm-slim as builder
+
+WORKDIR ./ente
+
+COPY . .
+COPY apps/ .
+
+# Will help default to yarn versoin 1.22.22
+RUN corepack enable
+
+# Endpoint for Ente Server
+ENV NEXT_PUBLIC_ENTE_ENDPOINT=https://your-ente-endpoint.com
+ENV NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT=https://your-albums-endpoint.com
+
+RUN yarn cache clean
+RUN yarn install --network-timeout 1000000000
+RUN yarn build:photos #&& yarn build:accounts && yarn build:auth && yarn build:cast
+
+FROM node:23-bookworm-slim
+WORKDIR /app
+
+COPY --from=builder /ente/apps/photos/out /app/photos
+#COPY --from=builder /ente/apps/accounts/out /app/accounts
+#COPY --from=builder /ente/apps/auth/out /app/auth
+#COPY --from=builder /ente/apps/cast/out /app/cast
+
+RUN npm install -g serve
+
+ENV PHOTOS=3000
+EXPOSE ${PHOTOS}
+
+#ENV ACCOUNTS=3001
+#EXPOSE ${ACCOUNTS}
+
+#ENV AUTH=3002
+#EXPOSE ${AUTH}
+
+#ENV CAST=3003
+#EXPOSE ${CAST}
+
+# The albums app does not have navigable pages on it, but the
+# port will be exposed in-order to self up the albums endpoint
+# `apps.public-albums` in museum.yaml configuration file.
+ENV ALBUMS=3004
+EXPOSE ${ALBUMS}
+
+CMD ["sh", "-c", "serve /app/photos -l tcp://0.0.0.0:${PHOTOS}"]
+# & serve /app/accounts -l tcp://0.0.0.0:${ACCOUNTS} & serve /app/auth -l tcp://0.0.0.0:${AUTH} & serve /app/cast -l tcp://0.0.0.0:${CAST}"]
+```
