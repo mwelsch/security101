@@ -1,4 +1,4 @@
-# Ente selfhosting
+# Ente selfhosting with traefik
 Based on [this github guide](https://github.com/ente-io/ente/blob/main/server/docs/docker.md):
 
 1. Create a directory where you'll run Ente
