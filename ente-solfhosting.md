@@ -51,8 +51,8 @@ Based on [this github guide](https://github.com/ente-io/ente/blob/main/server/do
 
 5. (Personal preference: Change docker volumes to local directories)
 
-## Traefik part for museum
-# This is specific to your traefik config so read carefully
+# Traefik part for museum
+## This is specific to your traefik config so read carefully
 1. Add the network your traefik container is in. In my case the tail of the file looks like this:
 ```
 networks:
@@ -77,7 +77,7 @@ networks:
 ```
 
  
-What wasn't included in any guide - and I raised concerns about it over here: https://github.com/ente-io/ente/discussions/5212 
+# What wasn't included in any guide - and I raised concerns about it over here: https://github.com/ente-io/ente/discussions/5212 
 
 1. Port `2112` of `museum`-container can be commented out if you do not use promotheus
 
@@ -103,6 +103,15 @@ Create a `web/Dockerfile` (my content is below, I commented out the parts not re
 Add the following to a `compose.yaml` in the root github directory (docker-compose will build the image in this case, if you want to build manually and insert the new tag manually each time: use the above guide (https://help.ente.io/self-hosting/guides/web-app) to build the web app, remove the build part and comment out the image part and insert your image name)
 
 YOU MIGHT NEED TO ADJUST FOR YOUR TRAEFIK CONFIG
+
+# Create accounts
+You can create an account and obtain the OTP from the docker logs if you did not configure an email server
+
+
+# Combine everything into one docker-compose
+IF EVERYTHING WORKED SO FAR:
+
+
 ```
 services:
   ente-web:
