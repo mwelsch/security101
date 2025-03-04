@@ -11,7 +11,7 @@ This is a documentation of how I self-host Ente Photos on my server behind a tra
   ```
   
 2. Place a Dockerfile insinde the `web` Folder to build the web app. Either use the [official one provided here](https://help.ente.io/self-hosting/guides/web-app) or my modified version attached below. I modified it TO ONLY RUN ENTE PHOTOS! (and updated the base image version from 20 to 23)
-3. Create a `compose.yaml` file in the main directory (yeit is supposed to be inside the server directory if you follow the official guide. But if I come back to update stuff later I will not remember where it was...). The code for the file is attached below and I explain there the modification I made to the original file. Your traefik config will probably be different from mine so you might need to change parts!
+3. Create a `compose.yaml` file in the main directory (yeit is supposed to be inside the server directory if you follow the official guide. But if I come back to update stuff later I will not remember where it was...). LOOK FOR STUFF IN CAPS FOR IMPORTANT NOTES. The code for the file is attached below and I explain there the modification I made to the original file. Your traefik config will probably be different from mine so you might need to change parts! 
 4. Create a `museum.yaml` file based on the one provided bellow. To generate new secrets use theis oneline provided from [this kind github](https://github.com/EdyTheCow/ente-selfhost) repo
   
   ```bash
@@ -44,7 +44,14 @@ This is a documentation of how I self-host Ente Photos on my server behind a tra
   ```
   
   Now run
-  
+```bash
+./ente account add
+./ente account list
+```
+This will need to be added to the admins in the `museum.yaml`. Restart your server.
+```
+./ente admin update-subscription -a ADMINEMAIL --no-limit True -u USEREMAIL
+```
   # `compose.yaml`
   
 1. I do not like docker volumes and modified the file to only use local directories
@@ -169,7 +176,7 @@ This is a documentation of how I self-host Ente Photos on my server behind a tra
         - minio
       volumes:
         - ./server/scripts/compose/minio-provision.sh:/provision.sh:ro
-        - ./minio-data:/data
+        - ./minio-data:/data # WHEN MOUNTING THIS AS A DIRECTORY YOU WILL NEED TO CHOWN THE DIRECTROY AFTER CREATION. chown -R 1001 minio-data
       networks:
         - default
       entrypoint: sh /provision.sh
