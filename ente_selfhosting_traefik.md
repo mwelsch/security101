@@ -25,7 +25,7 @@ This is a documentation of how I self-host Ente Photos on my server behind a tra
   | `POSTGRES_PASSWORD` | `compose.yaml` &  `server/scripts/compose/credentials.yaml` | secure random value |
   | `MINIO_ROOT_PASSWORD` | `compose.yaml` & `server/scripts/compose/minio-provision.sh` & `server/scripts/compose/credentials.yaml` | secure random value |
   | (OPTIONAL) `MINIO_ROOT_USER` | `compose.yaml` & `server/scripts/compose/minio-provision.sh` & `server/scripts/compose/credentials.yaml` | secure random value |
-  | YOURDOMAIN | `compose.yaml` & `museum.yaml` | your actual domain |
+  | YOURDOMAIN | `compose.yaml` & `museum.yaml` & `web/Dockerfile` | your actual domain |
   
   ### Now you should be able to reach your ente server under photos.example (you can also try api.example/ping )
   
@@ -301,8 +301,8 @@ This is a documentation of how I self-host Ente Photos on my server behind a tra
   # Will help default to yarn versoin 1.22.22
   RUN corepack enable
   # Endpoint for Ente Server
-  ENV NEXT_PUBLIC_ENTE_ENDPOINT=https://your-ente-endpoint.com
-  ENV NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT=https://your-albums-endpoint.com
+  ENV NEXT_PUBLIC_ENTE_ENDPOINT=https://api.YOURDOMAIN
+  ENV NEXT_PUBLIC_ENTE_ALBUMS_ENDPOINT=https://albums.YOURDOMAIN
   RUN yarn cache clean
   RUN yarn install --network-timeout 1000000000
   RUN yarn build:photos #&& yarn build:accounts && yarn build:auth && yarn build:cast
